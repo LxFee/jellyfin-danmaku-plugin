@@ -7,9 +7,13 @@
 <form id="danmakuConfigForm">
 <div class="checkboxContainer"><label><input is="emby-checkbox" type="checkbox" id="danmakuEnabled"><span>启用网页弹幕插件</span></label></div>
 <div class="checkboxContainer"><label><input is="emby-checkbox" type="checkbox" id="danmakuDefaultEnabled"><span>新浏览器默认开启弹幕</span></label></div>
+<div class="checkboxContainer"><label><input is="emby-checkbox" type="checkbox" id="danmakuOwnCredentials"><span>使用自己的弹弹play AppId 和 AppSecret</span></label></div>
+<p>启用后由 Jellyfin 主站签名并直接请求弹弹play，所有用户共用此应用额度。播放器不接收密钥，也不使用下面的公共代理或浏览器自定义接口。</p>
+<div class="inputContainer"><label class="inputLabel" for="danmakuAppId">AppId</label><input is="emby-input" type="text" autocomplete="off" id="danmakuAppId"></div>
+<div class="inputContainer"><label class="inputLabel" for="danmakuAppSecret">AppSecret</label><input is="emby-input" type="password" autocomplete="new-password" id="danmakuAppSecret"><div class="fieldDescription">在弹弹play开发者中心申请应用凭据。密钥保存在主站的插件配置中，仅管理员可查看或修改。</div></div>
 <div class="checkboxContainer"><label><input is="emby-checkbox" type="checkbox" id="danmakuPreferLocalXml"><span>新浏览器优先尝试本地 XML 弹幕</span></label></div>
 <p>个人开关、样式和匹配记录保存在当前浏览器。本地 XML 模式需另装提供 /api/danmu/{itemId}/raw 的数据插件；本插件默认从在线弹幕源加载。</p>
-<div class="inputContainer"><label class="inputLabel" for="danmakuApi">弹幕 API 地址</label><input is="emby-input" type="url" required id="danmakuApi"><div class="fieldDescription">弹弹play API 或兼容接口。设置自建接口时请使用允许浏览器跨域访问的地址。</div></div>
+<div class="inputContainer"><label class="inputLabel" for="danmakuApi">公共／自建弹幕 API 地址</label><input is="emby-input" type="url" required id="danmakuApi"><div class="fieldDescription">仅关闭自有凭据模式时生效。设置自建接口时请使用允许浏览器跨域访问的地址。</div></div>
 <div class="inputContainer"><label class="inputLabel" for="danmakuCors">CORS 代理前缀（可留空）</label><input is="emby-input" type="url" id="danmakuCors"><div class="fieldDescription">默认使用上游公共 CORS 代理；留空时直接访问 API。地址不能包含账号或 token。修改后刷新网页生效。</div></div>
 <button is="emby-button" type="submit" class="raised button-submit block"><span>保存</span></button>
 </form><p id="danmakuConfigStatus" role="status"></p>
@@ -25,6 +29,9 @@
             config = await ApiClient.getPluginConfiguration(id);
             page.querySelector('#danmakuEnabled').checked = config.Enabled;
             page.querySelector('#danmakuDefaultEnabled').checked = config.DefaultEnabled;
+            page.querySelector('#danmakuOwnCredentials').checked = !!config.UseOwnCredentials;
+            page.querySelector('#danmakuAppId').value = config.AppId || '';
+            page.querySelector('#danmakuAppSecret').value = config.AppSecret || '';
             page.querySelector('#danmakuPreferLocalXml').checked = config.PreferLocalXml;
             page.querySelector('#danmakuApi').value = config.ApiBaseUrl;
             page.querySelector('#danmakuCors').value = config.CorsProxyUrl;
@@ -35,6 +42,13 @@
         if (!config) return;
         config.Enabled = page.querySelector('#danmakuEnabled').checked;
         config.DefaultEnabled = page.querySelector('#danmakuDefaultEnabled').checked;
+        config.UseOwnCredentials = page.querySelector('#danmakuOwnCredentials').checked;
+        config.AppId = page.querySelector('#danmakuAppId').value.trim();
+        config.AppSecret = page.querySelector('#danmakuAppSecret').value.trim();
+        if (config.UseOwnCredentials && (!config.AppId || !config.AppSecret)) {
+            page.querySelector('#danmakuConfigStatus').textContent = '请填写 AppId 和 AppSecret';
+            return;
+        }
         config.PreferLocalXml = page.querySelector('#danmakuPreferLocalXml').checked;
         config.ApiBaseUrl = page.querySelector('#danmakuApi').value.trim();
         config.CorsProxyUrl = page.querySelector('#danmakuCors').value.trim();

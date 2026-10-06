@@ -396,6 +396,7 @@
     }
 
     function getApiPrefix() {
+        if (pluginDefaults.serverApiPrefix) return pluginDefaults.serverApiPrefix;
         const cors = window.ede.customCorsProxy.length > 7 ? window.ede.customCorsProxy : corsProxy;
         const api = window.ede.customApiPrefix.length > 7 ? window.ede.customApiPrefix : cors + apiPrefix;
         return api;
@@ -1104,6 +1105,10 @@
             </div>
             `;
 
+            if (pluginDefaults.serverApiPrefix) {
+                customCorsProxy.querySelector('.controlTitle').textContent = '当前使用主站配置的弹弹play应用凭据';
+                customCorsProxy.querySelectorAll('.custom-input-group').forEach(group => { group.style.display = 'none'; });
+            }
             controlItems.push(customCorsProxy);
         }
 
@@ -1417,8 +1422,23 @@
     }
 
     async function makeGetRequest(url) {
-        const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(15000) });
-        if (!response.ok) throw new Error('弹幕接口返回 HTTP ' + response.status);
+        const headers = { Accept: 'application/json' };
+        const target = new URL(url, location.href);
+        const server = pluginDefaults.serverApiPrefix ? new URL(pluginDefaults.serverApiPrefix, location.href) : null;
+        if (server && target.origin === location.origin && server.origin === location.origin
+            && target.pathname.startsWith(server.pathname.replace(/\/$/, '') + '/api/v2/')) {
+            const token = window.ApiClient?.accessToken();
+            if (!token) throw new Error('请先登录 Jellyfin 再加载弹幕');
+            headers['X-Emby-Token'] = token;
+        }
+        const response = await fetch(url, { headers, signal: AbortSignal.timeout(server ? 20000 : 15000) });
+        if (!response.ok) {
+            let message = '弹幕接口返回 HTTP ' + response.status;
+            if (server) {
+                try { message = (await response.json()).errorMessage || message; } catch (_) {}
+            }
+            throw new Error(message);
+        }
         return response;
     }
 

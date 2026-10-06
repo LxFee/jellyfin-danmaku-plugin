@@ -5,7 +5,7 @@
   "description": "Web player danmaku adapted for Jellyfin 12.2",
   "owner": "LxFee",
   "overview": "Independent web danmaku plugin based on Izumiko/jellyfin-danmaku",
-  "version": "1.0.0.0",
+  "version": "1.1.0.0",
   "targetAbi": "12.2.0.0",
   "status": "Active",
   "autoUpdate": false

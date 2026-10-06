@@ -12,5 +12,6 @@
 - 同源 XML API 使用当前 Jellyfin 会话鉴权；XML sender 保留字符串。
 - 弹幕请求超时、失败后可重试，显示 HTTP 状态；转义输入属性，调试日志用 textContent。
 - 服务端默认配置不覆盖浏览器个人设置，重复脚本不创建额外渲染器。
+- 自有应用凭据模式使用同源鉴权读取接口，优先于个人 API／CORS 覆盖；设置侧栏显示主站模式提示，应用凭据只由主站签名使用。
 
 构建：`dotnet build plugin/Jellyfin.Plugin.Danmaku.csproj -c Release`。打包：`pwsh tools/package.ps1`。服务端引用官方 NuGet `Jellyfin.Common` / `Jellyfin.Controller` 12.2.0，插件 ZIP 不附带这些宿主程序集。

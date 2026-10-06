@@ -24,9 +24,21 @@ public sealed class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     public override void UpdateConfiguration(BasePluginConfiguration configuration)
     {
         var value = (PluginConfiguration)configuration;
+        value.AppId = value.AppId.Trim();
+        value.AppSecret = value.AppSecret.Trim();
+        ValidateCredentials(value);
         ValidateUrl(value.ApiBaseUrl, false);
         ValidateUrl(value.CorsProxyUrl, true);
         base.UpdateConfiguration(configuration);
+    }
+
+    public static void ValidateCredentials(PluginConfiguration value)
+    {
+        if (value.AppId.Length > 256 || value.AppSecret.Length > 1024
+            || value.AppId.Any(char.IsControl) || value.AppSecret.Any(char.IsControl))
+            throw new ArgumentException("AppId 或 AppSecret 格式无效。");
+        if (value.UseOwnCredentials && (string.IsNullOrWhiteSpace(value.AppId) || string.IsNullOrWhiteSpace(value.AppSecret)))
+            throw new ArgumentException("使用自有凭据时必须填写 AppId 和 AppSecret。");
     }
 
     private static void ValidateUrl(string value, bool allowEmpty)
@@ -44,6 +56,9 @@ public sealed class PluginConfiguration : BasePluginConfiguration
     public bool Enabled { get; set; } = true;
     public bool DefaultEnabled { get; set; } = true;
     public bool PreferLocalXml { get; set; }
+    public bool UseOwnCredentials { get; set; }
+    public string AppId { get; set; } = "";
+    public string AppSecret { get; set; } = "";
     public string ApiBaseUrl { get; set; } = "https://api.dandanplay.net";
     public string CorsProxyUrl { get; set; } = "https://ddplay-api.930524.xyz/cors/";
 }

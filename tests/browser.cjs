@@ -6,9 +6,11 @@ const source = fs.readFileSync('plugin/Web/ede.js', 'utf8');
 const firstId = '11111111111111111111111111111111';
 const secondId = '22222222222222222222222222222222';
 let sourceFails = false;
+const danmakuRequests = [];
 const server = http.createServer((request, response) => {
     response.setHeader('content-type', 'application/json');
     const url = new URL(request.url, 'http://localhost');
+    if (url.pathname.includes('/api/v2/')) danmakuRequests.push({ path: url.pathname, token: request.headers['x-emby-token'] });
     if (url.pathname === '/') {
         response.setHeader('content-type', 'text/html');
         response.end('<html><head><meta name="application-name" content="Jellyfin"></head><body><div id="reactRoot"><div class="skinHeader"></div></div></body></html>');
@@ -26,20 +28,25 @@ const server = http.createServer((request, response) => {
     const root = 'http://127.0.0.1:' + server.address().port;
     const browser = await chromium.launch({ headless: true, channel: 'chrome' });
     try {
-        for (const transport of ['fetch', 'xhr']) {
+        for (const transport of ['fetch', 'xhr', 'own']) {
             const page = await browser.newPage();
             const errors = [];
             page.on('pageerror', e => errors.push(e.message));
             await page.goto(root);
-            await page.evaluate(({ root, firstId, secondId }) => {
+            await page.evaluate(({ root, firstId, secondId, transport }) => {
                 window.JellyfinDanmakuConfig = { apiBaseUrl: root, corsProxyUrl: '', defaultEnabled: true };
+                if (transport === 'own') {
+                    window.JellyfinDanmakuConfig.serverApiPrefix = '/jellyfin/JellyfinDanmaku';
+                    localStorage.setItem('customApiPrefix', 'https://unreachable.invalid');
+                    localStorage.setItem('customCorsProxy', 'https://unreachable.invalid/cors/');
+                }
                 window.itemsRead = [];
-                window.ApiClient = { getCurrentUserId: () => 'user', getItem: async (_, id) => {
+                window.ApiClient = { accessToken: () => 'fixture-session', getCurrentUserId: () => 'user', getItem: async (_, id) => {
                     window.itemsRead.push(id);
                     if (![firstId, secondId].includes(id)) throw Error('Wrong item ID');
                     return { Id: id, SeasonId: 'season', SeriesName: '测试', IndexNumber: id === firstId ? 1 : 2, ParentIndexNumber: 1 };
                 } };
-            }, { root, firstId, secondId });
+            }, { root, firstId, secondId, transport });
             await page.addScriptTag({ content: source });
             await page.addScriptTag({ content: source });
             assert.equal(await page.evaluate(() => window.itemsRead.length), 0);
@@ -57,7 +64,7 @@ const server = http.createServer((request, response) => {
             async function playback(id) {
                 await page.evaluate(({ id, transport }) => {
                     const url = '/Items/' + id + '/PlaybackInfo?UserId=user';
-                    return transport === 'fetch' ? fetch(url) : new Promise(resolve => { const xhr = new XMLHttpRequest(); xhr.open('POST', url); xhr.onload = resolve; xhr.send(); });
+                    return transport !== 'xhr' ? fetch(url) : new Promise(resolve => { const xhr = new XMLHttpRequest(); xhr.open('POST', url); xhr.onload = resolve; xhr.send(); });
                 }, { id, transport });
             }
             await playback(firstId);
@@ -71,6 +78,10 @@ const server = http.createServer((request, response) => {
             await page.locator('#danmakuSettings').click();
             await page.waitForFunction(() => Math.abs(document.querySelector('#danmakuSidebar').getBoundingClientRect().right - innerWidth) < 2);
             assert.equal(await page.locator('#danmakuSidebar').count(), 1);
+            if (transport === 'own') {
+                assert(await page.locator('.controlTitle').filter({ hasText: '主站配置的弹弹play应用凭据' }).isVisible());
+                assert.equal(await page.locator('#customApiPrefix').isVisible(), false);
+            }
             await page.locator('.danmakuSidebarCancelButton').click();
             await page.evaluate(() => document.querySelector('.videoPlayerContainer').remove());
             await page.waitForFunction(() => !window.ede.danmaku && !document.querySelector('#danmakuWrapper'));
@@ -78,6 +89,10 @@ const server = http.createServer((request, response) => {
             await page.close();
             console.log('PASS ' + transport + ': query-string URL, correct ItemId, duplicate script guard, delayed player, same-element item change, rendering, sidebar and cleanup');
         }
+        const ownRequests = danmakuRequests.filter(r => r.path.startsWith('/jellyfin/JellyfinDanmaku/api/v2/'));
+        assert(ownRequests.length > 0 && ownRequests.every(r => r.token === 'fixture-session'));
+        assert(danmakuRequests.filter(r => !r.path.startsWith('/jellyfin/JellyfinDanmaku/')).every(r => !r.token));
+        console.log('PASS own credentials mode: same-origin session headers, BaseUrl, stale overrides ignored, public requests exclude account token');
         const page = await browser.newPage();
         await page.goto(root);
         await page.evaluate(({ root, firstId }) => {
