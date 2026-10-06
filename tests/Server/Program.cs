@@ -155,7 +155,7 @@ await using (var api = apiBuilder.Build())
     using var browser = new HttpClient { BaseAddress = new Uri(api.Urls.Single()) };
     using var anonymous = await browser.GetAsync("/JellyfinDanmaku/api/v2/comment/1");
     Check(anonymous.StatusCode == HttpStatusCode.Unauthorized, "API requires authenticated Jellyfin session");
-    browser.DefaultRequestHeaders.Add("X-Emby-Token", "fixture-session");
+    browser.DefaultRequestHeaders.Add("Authorization", "MediaBrowser Token=\"fixture-session\"");
     using var authenticated = await browser.GetAsync("/JellyfinDanmaku/api/v2/comment/1");
     Check(authenticated.StatusCode == HttpStatusCode.OK && authenticated.Headers.CacheControl?.NoStore == true, "Authenticated controller serves JSON");
     upstream.Respond = _ => { var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests); response.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(60)); return response; };
@@ -181,7 +181,7 @@ sealed class FixtureHandler(Func<HttpRequestMessage, HttpResponseMessage> respon
 sealed class FixtureAuthentication(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync() => Task.FromResult(Request.Headers["X-Emby-Token"] == "fixture-session"
+    protected override Task<AuthenticateResult> HandleAuthenticateAsync() => Task.FromResult(Request.Headers.Authorization == "MediaBrowser Token=\"fixture-session\""
         ? AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "fixture-user")], "fixture")), "fixture"))
         : AuthenticateResult.NoResult());
 }

@@ -10,7 +10,7 @@ const danmakuRequests = [];
 const server = http.createServer((request, response) => {
     response.setHeader('content-type', 'application/json');
     const url = new URL(request.url, 'http://localhost');
-    if (url.pathname.includes('/api/v2/')) danmakuRequests.push({ path: url.pathname, token: request.headers['x-emby-token'] });
+    if (url.pathname.includes('/api/v2/')) danmakuRequests.push({ path: url.pathname, token: request.headers.authorization });
     if (url.pathname === '/') {
         response.setHeader('content-type', 'text/html');
         response.end('<html><head><meta name="application-name" content="Jellyfin"></head><body><div id="reactRoot"><div class="skinHeader"></div></div></body></html>');
@@ -90,7 +90,7 @@ const server = http.createServer((request, response) => {
             console.log('PASS ' + transport + ': query-string URL, correct ItemId, duplicate script guard, delayed player, same-element item change, rendering, sidebar and cleanup');
         }
         const ownRequests = danmakuRequests.filter(r => r.path.startsWith('/jellyfin/JellyfinDanmaku/api/v2/'));
-        assert(ownRequests.length > 0 && ownRequests.every(r => r.token === 'fixture-session'));
+        assert(ownRequests.length > 0 && ownRequests.every(r => r.token === 'MediaBrowser Token="fixture-session"'));
         assert(danmakuRequests.filter(r => !r.path.startsWith('/jellyfin/JellyfinDanmaku/')).every(r => !r.token));
         console.log('PASS own credentials mode: same-origin session headers, BaseUrl, stale overrides ignored, public requests exclude account token');
         const page = await browser.newPage();

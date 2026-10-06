@@ -4,7 +4,7 @@
 
 ## 安装与使用
 
-解压发布包到 Jellyfin 的 `config/plugins/Jellyfin.Danmaku_1.1.0.0/`，保留 DLL、manifest.json 和许可证，升级时把旧版本移出 plugins 目录，重启 Jellyfin。控制台 → 插件 → Jellyfin Danmaku 配置启用开关、默认弹幕源。修改配置后刷新网页。
+解压发布包到 Jellyfin 的 `config/plugins/Jellyfin.Danmaku_1.1.0.1/`，保留 DLL、manifest.json 和许可证，升级时把旧版本移出 plugins 目录，重启 Jellyfin。控制台 → 插件 → Jellyfin Danmaku 配置启用开关、默认弹幕源。修改配置后刷新网页。
 
 在网页内置播放器底部，弹幕图标控制显示，旁边的调节图标打开弹幕设置。支持样式、过滤、偏移、手动匹配和增加弹幕源。个人设置与匹配记录保存在浏览器 localStorage，插件页面的默认开关和本地 XML 偏好只用于没有个人设置的浏览器。
 

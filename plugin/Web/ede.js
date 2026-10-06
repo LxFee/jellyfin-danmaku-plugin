@@ -1429,7 +1429,7 @@
             && target.pathname.startsWith(server.pathname.replace(/\/$/, '') + '/api/v2/')) {
             const token = window.ApiClient?.accessToken();
             if (!token) throw new Error('请先登录 Jellyfin 再加载弹幕');
-            headers['X-Emby-Token'] = token;
+            headers.Authorization = 'MediaBrowser Token="' + token + '"';
         }
         const response = await fetch(url, { headers, signal: AbortSignal.timeout(server ? 20000 : 15000) });
         if (!response.ok) {
@@ -1661,7 +1661,7 @@
     async function getCommentsByPluginApi(jellyfinItemId) {
         const path = window.location.pathname.replace(/\/web\/(index\.html)?/, '/api/danmu/');
         const url = window.location.origin + path + jellyfinItemId + '/raw';
-        const response = await fetch(url, { headers: { 'X-Emby-Token': ApiClient.accessToken() } });
+        const response = await fetch(url, { headers: { Authorization: 'MediaBrowser Token="' + ApiClient.accessToken() + '"' } });
         if (!response.ok) {
             return null;
         }

@@ -9,7 +9,7 @@
 - 从成功的 fetch/XHR PlaybackInfo 请求路径获取 ItemId，支持参数；不把 MediaSourceId 当作条目 ID。
 - 初始化可等待播放器和 ApiClient，切集使过期加载失效，退出销毁渲染器与播放器观察器。
 - 提供独立设置按钮。12.2 原生播放器设置菜单会拒绝未知 action ID，上游菜单注入会引发未处理的 Promise rejection。
-- 同源 XML API 使用当前 Jellyfin 会话鉴权；XML sender 保留字符串。
+- 同源弹幕读取与 XML API 使用标准 Authorization 中的当前 Jellyfin 会话，不依赖 12.2 默认关闭的旧鉴权头；XML sender 保留字符串。
 - 弹幕请求超时、失败后可重试，显示 HTTP 状态；转义输入属性，调试日志用 textContent。
 - 服务端默认配置不覆盖浏览器个人设置，重复脚本不创建额外渲染器。
 - 自有应用凭据模式使用同源鉴权读取接口，优先于个人 API／CORS 覆盖；设置侧栏显示主站模式提示，应用凭据只由主站签名使用。

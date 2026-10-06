@@ -107,7 +107,7 @@ span('    function makeGetRequest(url)', '    async function getEpisodeInfo(', '
             && target.pathname.startsWith(server.pathname.replace(/\\/$/, '') + '/api/v2/')) {
             const token = window.ApiClient?.accessToken();
             if (!token) throw new Error('请先登录 Jellyfin 再加载弹幕');
-            headers['X-Emby-Token'] = token;
+            headers.Authorization = 'MediaBrowser Token="' + token + '"';
         }
         const response = await fetch(url, { headers, signal: AbortSignal.timeout(server ? 20000 : 15000) });
         if (!response.ok) {
@@ -144,7 +144,7 @@ for old, new in [
     ("window.ede.fontOptions?.replaceAll('\"', '&quot;') ?? ''", 'escapeHtml(window.ede.fontOptions)'),
 ]:
     replace(old, new)
-replace("        const response = await fetch(url);", "        const response = await fetch(url, { headers: { 'X-Emby-Token': ApiClient.accessToken() } });")
+replace("        const response = await fetch(url);", "        const response = await fetch(url, { headers: { Authorization: 'MediaBrowser Token=\"' + ApiClient.accessToken() + '\"' } });")
 replace("                const p = comment.getAttribute('p').split(',').map(Number);", "                const p = (comment.getAttribute('p') || '').split(',');\n                if (p.length < 8 || !Number.isFinite(Number(p[0]))) continue;")
 span('        if (!window.obVideo) {', '        if (!comments) {', '')
 replace('    async function createDanmaku(comments) {', '    async function createDanmaku(comments) {\n        const version = loadVersion;')

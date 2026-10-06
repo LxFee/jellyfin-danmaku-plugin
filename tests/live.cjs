@@ -19,7 +19,7 @@ const errors = [];
         if (fixture) await page.route(/api\.dandanplay\.net|\/JellyfinDanmaku\/api\/v2\//, route => {
             const url = route.request().url();
             if (url.includes('/JellyfinDanmaku/api/v2/')) sessionRequests.push({ sameOrigin: new URL(url).origin === new URL(root).origin,
-                authenticated: !!route.request().headers()['x-emby-token'] });
+                authenticated: route.request().headers().authorization?.startsWith('MediaBrowser Token="') === true });
             const body = url.includes('/search/episodes') ? { animes: [{ animeId: 123, animeTitle: '兼容性测试', type: 'tvseries', typeDescription: 'TV', episodes: Array.from({ length: 100 }, (_, i) => ({ episodeId: 123001 + i, episodeTitle: '第' + (i + 1) + '话' })) }] }
                 : url.includes('/related/') ? { relateds: [] }
                 : url.includes('/comment/') ? { comments: Array.from({ length: 1400 }, (_, i) => ({ cid: String(i), p: `${i},1,16777215,[BiliBili]fixture`, m: '弹幕兼容性测试 ' + i })) }
@@ -48,6 +48,10 @@ const errors = [];
                 { ...config, UseOwnCredentials: true, AppId: 'fixture-app', AppSecret: 'not-a-real-secret' }), restoreConfig);
             const script = await (await page.request.get(root + '/JellyfinDanmaku/ede.js')).text();
             assert(script.includes('"serverApiPrefix":"/JellyfinDanmaku"') && !script.includes('fixture-app') && !script.includes('not-a-real-secret'));
+            const session = await page.evaluate(() => ApiClient.accessToken());
+            const backend = await page.request.get(root + '/JellyfinDanmaku/api/v2/unsupported', { headers: { Authorization: 'MediaBrowser Token="' + session + '"' } });
+            assert.equal(backend.status(), 400); // Real controller authenticates before rejecting the route; no upstream request.
+            console.log('PASS actual host authorization without response interception');
             // Jellyfin hash navigation keeps the already loaded script defaults. Reload after changing mode.
             await page.reload({ waitUntil: 'commit' });
             await page.waitForFunction(() => window.JellyfinDanmakuConfig?.serverApiPrefix === '/JellyfinDanmaku');
