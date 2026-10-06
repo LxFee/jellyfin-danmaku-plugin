@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html><head><title>Jellyfin Danmaku</title></head><body>
+<div id="danmakuConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
+<div data-role="content"><div class="content-primary">
+<h1>Jellyfin 弹幕</h1>
+<p>适配 Jellyfin 12.2 的网页内置播放器。播放时使用弹幕按钮开关，旁边的弹幕设置按钮可调整样式与手动匹配。</p>
+<form id="danmakuConfigForm">
+<div class="checkboxContainer"><label><input is="emby-checkbox" type="checkbox" id="danmakuEnabled"><span>启用网页弹幕插件</span></label></div>
+<div class="checkboxContainer"><label><input is="emby-checkbox" type="checkbox" id="danmakuDefaultEnabled"><span>新浏览器默认开启弹幕</span></label></div>
+<div class="checkboxContainer"><label><input is="emby-checkbox" type="checkbox" id="danmakuPreferLocalXml"><span>新浏览器优先尝试本地 XML 弹幕</span></label></div>
+<p>个人开关、样式和匹配记录保存在当前浏览器。本地 XML 模式需另装提供 /api/danmu/{itemId}/raw 的数据插件；本插件默认从在线弹幕源加载。</p>
+<div class="inputContainer"><label class="inputLabel" for="danmakuApi">弹幕 API 地址</label><input is="emby-input" type="url" required id="danmakuApi"><div class="fieldDescription">弹弹play API 或兼容接口。设置自建接口时请使用允许浏览器跨域访问的地址。</div></div>
+<div class="inputContainer"><label class="inputLabel" for="danmakuCors">CORS 代理前缀（可留空）</label><input is="emby-input" type="url" id="danmakuCors"><div class="fieldDescription">默认使用上游公共 CORS 代理；留空时直接访问 API。地址不能包含账号或 token。修改后刷新网页生效。</div></div>
+<button is="emby-button" type="submit" class="raised button-submit block"><span>保存</span></button>
+</form><p id="danmakuConfigStatus" role="status"></p>
+</div></div>
+<script>
+(function () {
+    'use strict';
+    var id = 'aab50987-0d10-4615-96e3-3a89b758dd28';
+    var page = document.querySelector('#danmakuConfigPage');
+    var config;
+    page.addEventListener('pageshow', async function () {
+        try {
+            config = await ApiClient.getPluginConfiguration(id);
+            page.querySelector('#danmakuEnabled').checked = config.Enabled;
+            page.querySelector('#danmakuDefaultEnabled').checked = config.DefaultEnabled;
+            page.querySelector('#danmakuPreferLocalXml').checked = config.PreferLocalXml;
+            page.querySelector('#danmakuApi').value = config.ApiBaseUrl;
+            page.querySelector('#danmakuCors').value = config.CorsProxyUrl;
+        } catch (_) { page.querySelector('#danmakuConfigStatus').textContent = '配置加载失败'; }
+    });
+    page.querySelector('form').addEventListener('submit', async function (event) {
+        event.preventDefault();
+        if (!config) return;
+        config.Enabled = page.querySelector('#danmakuEnabled').checked;
+        config.DefaultEnabled = page.querySelector('#danmakuDefaultEnabled').checked;
+        config.PreferLocalXml = page.querySelector('#danmakuPreferLocalXml').checked;
+        config.ApiBaseUrl = page.querySelector('#danmakuApi').value.trim();
+        config.CorsProxyUrl = page.querySelector('#danmakuCors').value.trim();
+        try {
+            await ApiClient.updatePluginConfiguration(id, config);
+            page.querySelector('#danmakuConfigStatus').textContent = '已保存，刷新网页生效';
+        } catch (_) { page.querySelector('#danmakuConfigStatus').textContent = '保存失败，请检查地址和管理员权限'; }
+    });
+})();
+</script></div></body></html>

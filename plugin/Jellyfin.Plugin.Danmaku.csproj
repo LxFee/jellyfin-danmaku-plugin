@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DebugType>none</DebugType>
+    <Version>1.0.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Jellyfin.Common" Version="12.2.0" ExcludeAssets="runtime" />
+    <PackageReference Include="Jellyfin.Controller" Version="12.2.0" ExcludeAssets="runtime" />
+    <EmbeddedResource Include="Web/ede.js" />
+    <EmbeddedResource Include="Configuration/config.html" />
+  </ItemGroup>
+</Project>

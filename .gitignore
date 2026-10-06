@@ -1,0 +1,6 @@
+**/bin/
+**/obj/
+.tools/
+artifacts/
+node_modules/
+*.log
