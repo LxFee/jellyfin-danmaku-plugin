@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html><head><title>Jellyfin Danmaku</title></head><body>
-<div id="JellyfinDanmakuConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox,emby-select">
+<div id="JellyfinDanmakuConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
 <div data-role="content"><div class="content-primary">
 <h1>Jellyfin 弹幕</h1>
 <p>适配 Jellyfin 12.2 的网页内置播放器。播放时使用弹幕按钮开关，旁边的弹幕设置按钮可调整样式与手动匹配。</p>
@@ -9,22 +9,8 @@
 <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="danmakuDefaultEnabled"><span>新浏览器默认开启弹幕</span></label>
 <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="danmakuPreferLocalXml"><span>新浏览器优先尝试本地 XML 弹幕</span></label>
 <p>个人开关、样式和匹配记录保存在当前浏览器。本地 XML 模式需另装提供 /api/danmu/{itemId}/raw 的数据插件；本插件默认从在线弹幕源加载。</p>
-<div class="inputContainer"><input is="emby-input" type="url" required id="danmakuApi" label="弹幕 API 地址"><div class="fieldDescription">两种鉴权方式共用此地址，默认 https://api.dandanplay.net。填写 API 基础地址，不包含 /api/v2；可包含自建服务的路径前缀。</div></div>
-<div class="selectContainer">
-<select is="emby-select" id="danmakuSourceMode" label="接口鉴权方式">
-<option value="public">公共／自建接口</option>
-<option value="credentials">自己的 AppId 和 AppSecret</option>
-</select>
-<div class="fieldDescription">两种方式择一使用，切换后保留另一种方式已保存的配置。</div>
-</div>
-<div id="JellyfinDanmakuPublicFields" class="hide">
-<div class="inputContainer"><input is="emby-input" type="url" disabled id="danmakuCors" label="CORS 代理前缀（可留空）"><div class="fieldDescription">通过公共／自建代理访问上面的 API 地址；默认使用上游公共 CORS 代理。留空时浏览器直接访问 API，接口需支持跨域。地址不能包含账号或 token。</div></div>
-</div>
-<div id="JellyfinDanmakuCredentialFields" class="hide">
-<p>由 Jellyfin 主站使用 AppId 和 AppSecret 签名，请求上面配置的 API 地址，所有用户共用此应用额度。此模式不使用 CORS 代理或浏览器自定义接口。</p>
-<div class="inputContainer"><input is="emby-input" type="text" disabled autocomplete="off" id="danmakuAppId" label="AppId"></div>
-<div class="inputContainer"><input is="emby-input" type="password" disabled autocomplete="new-password" id="danmakuAppSecret" label="AppSecret"><div class="fieldDescription">在弹弹play开发者中心申请应用凭据。密钥保存在主站的插件配置中，仅管理员可查看或修改。</div></div>
-</div>
+<div class="inputContainer"><input is="emby-input" type="url" required id="danmakuApi" label="弹幕 API 地址"><div class="fieldDescription">填写兼容弹弹play API 的公共或自建接口基础地址，不包含 /api/v2；可包含自建服务的路径前缀。</div></div>
+<div class="inputContainer"><input is="emby-input" type="url" id="danmakuCors" label="CORS 代理前缀（可留空）"><div class="fieldDescription">浏览器通过此前缀访问 API。留空时直接访问 API，接口需支持跨域。默认地址也可被播放器个人设置覆盖。</div></div>
 <button is="emby-button" type="submit" class="raised button-submit block"><span>保存</span></button>
 </form><p id="danmakuConfigStatus" role="status"></p>
 </div></div>
@@ -33,35 +19,15 @@
     'use strict';
     var id = 'aab50987-0d10-4615-96e3-3a89b758dd28';
     var page = document.querySelector('#JellyfinDanmakuConfigPage');
-    var mode = page.querySelector('#danmakuSourceMode');
     var config;
-    function updateMode() {
-        var own = mode.value === 'credentials';
-        page.querySelector('#JellyfinDanmakuCredentialFields').classList.toggle('hide', !own);
-        page.querySelector('#JellyfinDanmakuPublicFields').classList.toggle('hide', own);
-        ['#danmakuAppId', '#danmakuAppSecret'].forEach(function (selector) {
-            var input = page.querySelector(selector);
-            input.disabled = !own;
-            input.required = own;
-        });
-        page.querySelector('#danmakuCors').disabled = own;
-    }
-    mode.addEventListener('change', function () {
-        updateMode();
-        page.querySelector('#danmakuConfigStatus').textContent = '';
-    });
     page.addEventListener('pageshow', async function () {
         try {
             config = await ApiClient.getPluginConfiguration(id);
             page.querySelector('#danmakuEnabled').checked = config.Enabled;
             page.querySelector('#danmakuDefaultEnabled').checked = config.DefaultEnabled;
-            mode.value = config.UseOwnCredentials ? 'credentials' : 'public';
-            page.querySelector('#danmakuAppId').value = config.AppId || '';
-            page.querySelector('#danmakuAppSecret').value = config.AppSecret || '';
             page.querySelector('#danmakuPreferLocalXml').checked = config.PreferLocalXml;
             page.querySelector('#danmakuApi').value = config.ApiBaseUrl;
             page.querySelector('#danmakuCors').value = config.CorsProxyUrl;
-            updateMode();
         } catch (_) { page.querySelector('#danmakuConfigStatus').textContent = '配置加载失败'; }
     });
     page.querySelector('form').addEventListener('submit', async function (event) {
@@ -69,18 +35,8 @@
         if (!config) return;
         config.Enabled = page.querySelector('#danmakuEnabled').checked;
         config.DefaultEnabled = page.querySelector('#danmakuDefaultEnabled').checked;
-        config.UseOwnCredentials = mode.value === 'credentials';
         config.ApiBaseUrl = page.querySelector('#danmakuApi').value.trim();
-        if (config.UseOwnCredentials) {
-            config.AppId = page.querySelector('#danmakuAppId').value.trim();
-            config.AppSecret = page.querySelector('#danmakuAppSecret').value.trim();
-        } else {
-            config.CorsProxyUrl = page.querySelector('#danmakuCors').value.trim();
-        }
-        if (config.UseOwnCredentials && (!config.AppId || !config.AppSecret)) {
-            page.querySelector('#danmakuConfigStatus').textContent = '请填写 AppId 和 AppSecret';
-            return;
-        }
+        config.CorsProxyUrl = page.querySelector('#danmakuCors').value.trim();
         config.PreferLocalXml = page.querySelector('#danmakuPreferLocalXml').checked;
         try {
             await ApiClient.updatePluginConfiguration(id, config);

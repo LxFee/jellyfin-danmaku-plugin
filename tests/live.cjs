@@ -5,21 +5,16 @@ const credentials = JSON.parse(fs.readFileSync(process.env.JELLYFIN_TEST_CREDENT
 const root = process.env.JELLYFIN_TEST_URL;
 if (!root) throw new Error('Set JELLYFIN_TEST_URL to your Jellyfin test server');
 const fixture = process.env.DANMAKU_FIXTURE === '1';
-const ownMode = process.env.DANMAKU_TEST_OWN_MODE === '1';
-if (ownMode && !fixture) throw new Error('Own-mode host validation requires fixture responses');
 const errors = [];
 (async () => {
     const browser = await chromium.launch({ headless: true, channel: 'chrome' });
-    let page, restoreConfig;
-    const sessionRequests = [];
+    let page;
     try {
         page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' });
         page.setDefaultTimeout(30000);
         page.on('pageerror', error => { if (error.message !== 'CancelledError') errors.push(error.message); });
-        if (fixture) await page.route(/api\.dandanplay\.net|\/JellyfinDanmaku\/api\/v2\//, route => {
+        if (fixture) await page.route(/\/api\/v2\//, route => {
             const url = route.request().url();
-            if (url.includes('/JellyfinDanmaku/api/v2/')) sessionRequests.push({ sameOrigin: new URL(url).origin === new URL(root).origin,
-                authenticated: route.request().headers().authorization?.startsWith('MediaBrowser Token="') === true });
             const body = url.includes('/search/episodes') ? { animes: [{ animeId: 123, animeTitle: '兼容性测试', type: 'tvseries', typeDescription: 'TV', episodes: Array.from({ length: 100 }, (_, i) => ({ episodeId: 123001 + i, episodeTitle: '第' + (i + 1) + '话' })) }] }
                 : url.includes('/related/') ? { relateds: [] }
                 : url.includes('/comment/') ? { comments: Array.from({ length: 1400 }, (_, i) => ({ cid: String(i), p: `${i},1,16777215,[BiliBili]fixture`, m: '弹幕兼容性测试 ' + i })) }
@@ -39,45 +34,16 @@ const errors = [];
         assert.equal(await page.evaluate(() => !!window.JellyfinDanmakuLoaded), true);
         assert.equal(await page.locator('script[src*="/JellyfinEdge/edge.js"]').count(), 1);
         console.log('PASS actual 12.2 plugin script and Edge coexistence');
-        const anonymous = await page.request.get(root + '/JellyfinDanmaku/api/v2/comment/1');
-        assert.equal(anonymous.status(), 401);
-        console.log('PASS real Jellyfin endpoint rejects anonymous access');
-        if (ownMode) {
-            restoreConfig = await page.evaluate(() => ApiClient.getPluginConfiguration('aab50987-0d10-4615-96e3-3a89b758dd28'));
-            await page.evaluate(config => ApiClient.updatePluginConfiguration('aab50987-0d10-4615-96e3-3a89b758dd28',
-                { ...config, UseOwnCredentials: true, AppId: 'fixture-app', AppSecret: 'not-a-real-secret' }), restoreConfig);
-            const script = await (await page.request.get(root + '/JellyfinDanmaku/ede.js')).text();
-            assert(script.includes('"serverApiPrefix":"/JellyfinDanmaku"') && !script.includes('fixture-app') && !script.includes('not-a-real-secret'));
-            const session = await page.evaluate(() => ApiClient.accessToken());
-            const backend = await page.request.get(root + '/JellyfinDanmaku/api/v2/unsupported', { headers: { Authorization: 'MediaBrowser Token="' + session + '"' } });
-            assert.equal(backend.status(), 400); // Real controller authenticates before rejecting the route; no upstream request.
-            console.log('PASS actual host authorization without response interception');
-            if (process.env.JELLYFIN_TEST_LOOPBACK_API) {
-                const ownConfig = await page.evaluate(() => ApiClient.getPluginConfiguration('aab50987-0d10-4615-96e3-3a89b758dd28'));
-                try {
-                    await page.evaluate(({ config, url }) => ApiClient.updatePluginConfiguration('aab50987-0d10-4615-96e3-3a89b758dd28',
-                        { ...config, ApiBaseUrl: url }), { config: ownConfig, url: process.env.JELLYFIN_TEST_LOOPBACK_API });
-                    // Point to this host's authenticated danmaku route. The outbound request must use
-                    // the configured origin/prefix without forwarding the Jellyfin session, yielding 401.
-                    const configured = await page.request.get(root + '/JellyfinDanmaku/api/v2/comment/1',
-                        { headers: { Authorization: 'MediaBrowser Token="' + session + '"' } });
-                    assert.equal(configured.status(), 401);
-                    console.log('PASS actual host uses configured API origin/prefix without forwarding Jellyfin session');
-                } finally {
-                    await page.evaluate(config => ApiClient.updatePluginConfiguration('aab50987-0d10-4615-96e3-3a89b758dd28', config), ownConfig);
-                }
-            }
-            // Jellyfin hash navigation keeps the already loaded script defaults. Reload after changing mode.
-            await page.reload({ waitUntil: 'commit' });
-            await page.waitForFunction(() => window.JellyfinDanmakuConfig?.serverApiPrefix === '/JellyfinDanmaku');
-            console.log('PASS own configuration persistence and public script secret isolation');
-        }
+        const session = await page.evaluate(() => ApiClient.accessToken());
+        const removed = await page.request.get(root + '/JellyfinDanmaku/api/v2/comment/1',
+            { headers: { Authorization: 'MediaBrowser Token="' + session + '"' } });
+        assert.equal(removed.status(), 404);
+        console.log('PASS removed server credentials endpoint is unavailable');
         await page.goto(root + '/web/index.html#/configurationpage?name=JellyfinDanmaku', { waitUntil: 'commit' });
         await page.locator('#JellyfinDanmakuConfigPage').waitFor({ state: 'visible' });
         await page.waitForFunction(() => document.querySelector('#danmakuApi').value.startsWith('https://'));
-        assert.equal(await page.locator('#danmakuAppSecret').getAttribute('type'), 'password');
-        assert.equal(await page.locator('#danmakuSourceMode').count(), 1);
-        if (ownMode) assert.equal(await page.locator('#danmakuSourceMode').inputValue(), 'credentials');
+        assert.equal(await page.locator('#danmakuAppId, #danmakuAppSecret, #danmakuSourceMode').count(), 0);
+        assert(await page.locator('#danmakuApi').isVisible() && await page.locator('#danmakuCors').isVisible());
         await page.locator('#JellyfinDanmakuConfigForm button[type=submit]').click();
         await page.waitForFunction(() => document.querySelector('#danmakuConfigStatus').textContent.includes('已保存'));
         console.log('PASS native plugin configuration read/save');
@@ -121,18 +87,9 @@ const errors = [];
         assert.equal(await page.locator('#danmakuCtr').count(), 1);
         console.log('PASS exit cleanup and replay without duplicate controls');
         assert.deepEqual(errors, []);
-        if (ownMode) {
-            assert(sessionRequests.length > 0 && sessionRequests.every(r => r.sameOrigin && r.authenticated));
-            console.log('PASS real own-mode reads carry same-origin Jellyfin session');
-        }
         console.log('PASS no browser exceptions; source=' + (fixture ? 'deterministic online fixtures' : 'real upstream online service'));
     } finally {
-        try {
-            if (restoreConfig && page) {
-                await page.evaluate(config => ApiClient.updatePluginConfiguration('aab50987-0d10-4615-96e3-3a89b758dd28', config), restoreConfig);
-                console.log('PASS original host credential configuration restored');
-            }
-        } finally { await browser.close(); }
+        await browser.close();
     }
 })().catch(error => {
     console.error(error.name + ': ' + error.message.replace(/https?:\/\/\S+/g, '[url]'));

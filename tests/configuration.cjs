@@ -14,11 +14,6 @@ const errors = [];
     try {
         page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, serviceWorkers: 'block' });
         page.on('pageerror', error => { if (error.message !== 'CancelledError') errors.push(error.message); });
-        if (process.env.DANMAKU_CONFIG_PREVIEW === '1') {
-            const html = fs.readFileSync('plugin/Configuration/config.html', 'utf8');
-            await page.route(url => url.pathname.endsWith('/configurationpage') && url.searchParams.get('name') === 'JellyfinDanmaku',
-                route => route.fulfill({ contentType: 'text/html', body: html }));
-        }
         await page.goto(root + '/web/index.html#/login', { waitUntil: 'commit' });
         await page.locator('.btnManual:visible, #txtManualName:visible').first().waitFor();
         if (!await page.locator('#txtManualName').isVisible()) {
@@ -30,79 +25,37 @@ const errors = [];
         await page.locator('form button.button-submit[type="submit"]:visible').click();
         await page.waitForURL(url => /^#\/(home|index)/.test(url.hash));
         original = await page.evaluate(id => ApiClient.getPluginConfiguration(id), pluginId);
-        const fixture = { ...original, UseOwnCredentials: false, AppId: 'fixture-app', AppSecret: 'not-a-real-secret',
-            ApiBaseUrl: 'https://api.dandanplay.net', CorsProxyUrl: 'https://ddplay-api.930524.xyz/cors/' };
-        await page.evaluate(({ id, config }) => ApiClient.updatePluginConfiguration(id, config), { id: pluginId, config: fixture });
+        assert(!['UseOwnCredentials', 'AppId', 'AppSecret'].some(key => key in original));
         await page.goto(configUrl, { waitUntil: 'commit' });
-        const mode = page.locator('#danmakuSourceMode');
-        const publicFields = page.locator('#JellyfinDanmakuPublicFields');
-        const credentialFields = page.locator('#JellyfinDanmakuCredentialFields');
-        const appId = page.locator('#danmakuAppId');
-        const secret = page.locator('#danmakuAppSecret');
         const api = page.locator('#danmakuApi');
         const cors = page.locator('#danmakuCors');
-        const submit = page.locator('#JellyfinDanmakuConfigForm button[type=submit]');
-        const saved = async () => page.waitForFunction(() => document.querySelector('#danmakuConfigStatus').textContent.includes('已保存'));
-        const read = () => page.evaluate(id => ApiClient.getPluginConfiguration(id), pluginId);
-        const screenshot = async name => page.screenshot({ path: (process.env.DANMAKU_CONFIG_SCREENSHOT_PREFIX || 'artifacts/configuration') + '-' + name + '.png', fullPage: true });
-        await page.waitForFunction(() => document.querySelector('#danmakuApi')?.value === 'https://api.dandanplay.net');
-        assert.equal(await mode.inputValue(), 'public');
-        assert(await publicFields.isVisible() && !await credentialFields.isVisible());
-        assert(await secret.isDisabled() && !await api.isDisabled());
-        assert(await mode.evaluate(el => el.classList.contains('emby-select')));
-        await screenshot('public');
-        console.log('PASS public mode shows only native API/CORS controls');
-
-        await mode.selectOption('credentials');
-        assert(await credentialFields.isVisible() && !await publicFields.isVisible());
-        assert(!await secret.isDisabled() && !await api.isDisabled() && await api.isVisible());
-        assert(await cors.isDisabled());
-        assert.equal(await secret.getAttribute('type'), 'password');
+        const form = page.locator('#JellyfinDanmakuConfigForm');
+        await page.waitForFunction(() => !!document.querySelector('#danmakuApi')?.value);
+        assert.equal(await page.locator('#danmakuSourceMode, #danmakuAppId, #danmakuAppSecret').count(), 0);
+        assert(await api.isVisible() && await cors.isVisible() && !await api.isDisabled() && !await cors.isDisabled());
         const appearance = await page.evaluate(() => Array.from(document.querySelectorAll('#JellyfinDanmakuConfigForm .emby-input')).map(el => {
             const style = getComputedStyle(el);
-            return { labels: el.labels.length, styles: ['backgroundColor', 'backgroundImage', 'border', 'borderRadius', 'fontSize', 'padding', 'color'].map(key => style[key]) };
+            return { labels: el.labels.length, styles: ['backgroundColor', 'border', 'borderRadius', 'fontSize', 'padding', 'color'].map(key => style[key]) };
         }));
-        assert(appearance.every(input => input.labels === 1));
-        assert(appearance.every(input => JSON.stringify(input.styles) === JSON.stringify(appearance[0].styles)));
-        await appId.fill('');
-        assert.equal(await page.locator('#JellyfinDanmakuConfigForm').evaluate(el => el.checkValidity()), false);
-        await appId.fill('ui-test-app');
-        await secret.fill('ui-test-secret');
-        // The shared API remains required; inactive CORS values do not overwrite saved configuration.
+        assert.equal(appearance.length, 2);
+        assert(appearance.every(input => input.labels === 1 && JSON.stringify(input.styles) === JSON.stringify(appearance[0].styles)));
         await api.fill('');
-        assert.equal(await page.locator('#JellyfinDanmakuConfigForm').evaluate(el => el.checkValidity()), false);
+        assert.equal(await form.evaluate(el => el.checkValidity()), false);
         const customApi = 'https://danmaku.example.test/edge';
         await api.fill(customApi);
-        await cors.evaluate(el => { el.value = ''; });
-        assert.equal(await page.locator('#JellyfinDanmakuConfigForm').evaluate(el => el.checkValidity()), true);
-        await submit.click();
-        await saved();
-        let value = await read();
-        assert(value.UseOwnCredentials && value.AppId === 'ui-test-app' && value.AppSecret === 'ui-test-secret');
+        await cors.fill('');
+        assert.equal(await form.evaluate(el => el.checkValidity()), true);
+        await form.locator('button[type=submit]').click();
+        await page.waitForFunction(() => document.querySelector('#danmakuConfigStatus').textContent.includes('已保存'));
+        const value = await page.evaluate(id => ApiClient.getPluginConfiguration(id), pluginId);
         assert.equal(value.ApiBaseUrl, customApi);
-        assert.equal(value.CorsProxyUrl, fixture.CorsProxyUrl);
-        await page.reload({ waitUntil: 'commit' });
-        await page.waitForFunction(() => document.querySelector('#danmakuAppId')?.value === 'ui-test-app');
-        assert.equal(await mode.inputValue(), 'credentials');
-        assert(await credentialFields.isVisible() && !await publicFields.isVisible());
-        assert.equal(await api.inputValue(), customApi);
-        await screenshot('credentials');
-        console.log('PASS shared API editable in credential mode; masked secret, matching styles and save/reload persistence');
-
-        await mode.selectOption('public');
-        await secret.evaluate(el => { el.value = ''; });
-        assert.equal(await page.locator('#JellyfinDanmakuConfigForm').evaluate(el => el.checkValidity()), true);
-        await submit.click();
-        await saved();
-        value = await read();
-        assert(!value.UseOwnCredentials && value.AppId === 'ui-test-app' && value.AppSecret === 'ui-test-secret');
-        assert.equal(value.ApiBaseUrl, customApi);
+        assert.equal(value.CorsProxyUrl, '');
         await page.reload({ waitUntil: 'commit' });
         await page.waitForFunction(() => document.querySelector('#danmakuApi')?.value === 'https://danmaku.example.test/edge');
-        assert.equal(await mode.inputValue(), 'public');
-        assert(await publicFields.isVisible() && !await credentialFields.isVisible());
+        assert.equal(await cors.inputValue(), '');
+        await page.screenshot({ path: process.env.DANMAKU_CONFIG_SCREENSHOT || 'artifacts/configuration-public.png', fullPage: true });
         assert.deepEqual(errors, []);
-        console.log('PASS switching back shares API and preserves saved credentials/CORS; no browser exceptions');
+        console.log('PASS native API/CORS controls, obsolete credentials removed, required API, empty CORS, save/reload and consistent styles');
     } finally {
         try {
             if (original && page) {

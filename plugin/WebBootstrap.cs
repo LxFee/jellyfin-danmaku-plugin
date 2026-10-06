@@ -19,9 +19,6 @@ public sealed class ServiceRegistrator : IPluginServiceRegistrator
     {
         // The outer filter composes the downstream index, including Edge's injected script.
         services.Insert(0, ServiceDescriptor.Transient<IStartupFilter, WebBootstrap>());
-        services.AddSingleton(_ => new DanmakuSource(() => Plugin.Instance.Configuration,
-            new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false, AutomaticDecompression = System.Net.DecompressionMethods.All })
-            { Timeout = TimeSpan.FromSeconds(15) }));
     }
 }
 
@@ -53,8 +50,7 @@ public sealed class DanmakuMiddleware(RequestDelegate next, Func<string> prefix,
         if (path == scriptPath)
         {
             var defaults = JsonSerializer.Serialize(new { defaultEnabled = config.DefaultEnabled,
-                preferLocalXml = config.PreferLocalXml, apiBaseUrl = config.ApiBaseUrl, corsProxyUrl = config.CorsProxyUrl,
-                serverApiPrefix = config.UseOwnCredentials ? prefix() + "/JellyfinDanmaku" : "" });
+                preferLocalXml = config.PreferLocalXml, apiBaseUrl = config.ApiBaseUrl, corsProxyUrl = config.CorsProxyUrl });
             var body = Encoding.UTF8.GetBytes("window.JellyfinDanmakuConfig=" + defaults + ";\n" + Source);
             context.Response.ContentType = "text/javascript; charset=utf-8";
             context.Response.Headers.CacheControl = "no-store";
