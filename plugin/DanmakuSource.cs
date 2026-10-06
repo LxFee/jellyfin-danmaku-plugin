@@ -10,7 +10,7 @@ namespace Jellyfin.Plugin.Danmaku;
 
 public sealed record SourceResponse(int Status, byte[] Body, string? RetryAfter = null);
 
-// Only the fixed official read API is signed. Browser headers and arbitrary targets never reach it.
+// Only the administrator-configured API is signed. Browser requests cannot choose an upstream target.
 public sealed class DanmakuSource(Func<PluginConfiguration> configuration, HttpClient client) : IDisposable
 {
     private const int MaximumBody = 12 * 1024 * 1024;
@@ -34,9 +34,12 @@ public sealed class DanmakuSource(Func<PluginConfiguration> configuration, HttpC
             || query.Sum(p => p.Key.Length + p.Value.ToString().Length) > 8192)
             return Error(400, "不支持的弹幕读取接口或参数。");
 
-        var apiPath = "/api/v2/" + path;
-        var uri = new Uri("https://api.dandanplay.net" + apiPath + QueryString.Create(query.Select(p =>
+        Uri apiBase;
+        try { apiBase = Plugin.ValidateUrl(config.ApiBaseUrl, false)!; }
+        catch (ArgumentException) { return Error(503, "请管理员检查弹幕 API 地址。"); }
+        var uri = new Uri(apiBase.AbsoluteUri.TrimEnd('/') + "/api/v2/" + path + QueryString.Create(query.Select(p =>
             new KeyValuePair<string, string?>(p.Key, p.Value.ToString()))));
+        var apiPath = uri.AbsolutePath;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(15));
         var requestToken = deadline.Token;
@@ -60,8 +63,10 @@ public sealed class DanmakuSource(Func<PluginConfiguration> configuration, HttpC
                 {
                     if (redirects == 3 || response.Headers.Location is null) return Error(502, "弹幕接口重定向失败。");
                     uri = new Uri(uri, response.Headers.Location);
-                    if (uri.Scheme != "https" || !uri.IsDefaultPort || uri.UserInfo.Length != 0
-                        || !(uri.Host == "dandanplay.net" || uri.Host.EndsWith(".dandanplay.net", StringComparison.OrdinalIgnoreCase)))
+                    var sameOrigin = uri.Scheme == apiBase.Scheme && uri.IdnHost.Equals(apiBase.IdnHost, StringComparison.OrdinalIgnoreCase) && uri.Port == apiBase.Port;
+                    var officialCdn = uri.Scheme == "https" && uri.IsDefaultPort
+                        && (uri.Host == "dandanplay.net" || uri.Host.EndsWith(".dandanplay.net", StringComparison.OrdinalIgnoreCase));
+                    if (uri.UserInfo.Length != 0 || !(sameOrigin || officialCdn))
                         return Error(502, "弹幕接口返回了不支持的下载地址。");
                     continue; // CDN requests carry no application or Jellyfin credentials.
                 }

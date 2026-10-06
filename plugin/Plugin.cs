@@ -41,13 +41,14 @@ public sealed class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             throw new ArgumentException("使用自有凭据时必须填写 AppId 和 AppSecret。");
     }
 
-    private static void ValidateUrl(string value, bool allowEmpty)
+    internal static Uri? ValidateUrl(string value, bool allowEmpty)
     {
-        if (allowEmpty && string.IsNullOrWhiteSpace(value)) return;
+        if (allowEmpty && string.IsNullOrWhiteSpace(value)) return null;
         if (value.Length > 2048 || !Uri.TryCreate(value, UriKind.Absolute, out var uri)
             || uri.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(uri.UserInfo)
             || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
             throw new ArgumentException("弹幕接口地址必须为 HTTP(S) URL，不能包含账号、查询参数或片段。");
+        return uri;
     }
 }
 

@@ -40,6 +40,7 @@ const errors = [];
         const appId = page.locator('#danmakuAppId');
         const secret = page.locator('#danmakuAppSecret');
         const api = page.locator('#danmakuApi');
+        const cors = page.locator('#danmakuCors');
         const submit = page.locator('#JellyfinDanmakuConfigForm button[type=submit]');
         const saved = async () => page.waitForFunction(() => document.querySelector('#danmakuConfigStatus').textContent.includes('已保存'));
         const read = () => page.evaluate(id => ApiClient.getPluginConfiguration(id), pluginId);
@@ -54,7 +55,8 @@ const errors = [];
 
         await mode.selectOption('credentials');
         assert(await credentialFields.isVisible() && !await publicFields.isVisible());
-        assert(!await secret.isDisabled() && await api.isDisabled());
+        assert(!await secret.isDisabled() && !await api.isDisabled() && await api.isVisible());
+        assert(await cors.isDisabled());
         assert.equal(await secret.getAttribute('type'), 'password');
         const appearance = await page.evaluate(() => Array.from(document.querySelectorAll('#JellyfinDanmakuConfigForm .emby-input')).map(el => {
             const style = getComputedStyle(el);
@@ -66,21 +68,26 @@ const errors = [];
         assert.equal(await page.locator('#JellyfinDanmakuConfigForm').evaluate(el => el.checkValidity()), false);
         await appId.fill('ui-test-app');
         await secret.fill('ui-test-secret');
-        // Inactive required fields do not block saving or overwrite their saved values.
-        await api.evaluate(el => { el.value = ''; });
+        // The shared API remains required; inactive CORS values do not overwrite saved configuration.
+        await api.fill('');
+        assert.equal(await page.locator('#JellyfinDanmakuConfigForm').evaluate(el => el.checkValidity()), false);
+        const customApi = 'https://danmaku.example.test/edge';
+        await api.fill(customApi);
+        await cors.evaluate(el => { el.value = ''; });
         assert.equal(await page.locator('#JellyfinDanmakuConfigForm').evaluate(el => el.checkValidity()), true);
         await submit.click();
         await saved();
         let value = await read();
         assert(value.UseOwnCredentials && value.AppId === 'ui-test-app' && value.AppSecret === 'ui-test-secret');
-        assert.equal(value.ApiBaseUrl, fixture.ApiBaseUrl);
+        assert.equal(value.ApiBaseUrl, customApi);
         assert.equal(value.CorsProxyUrl, fixture.CorsProxyUrl);
         await page.reload({ waitUntil: 'commit' });
         await page.waitForFunction(() => document.querySelector('#danmakuAppId')?.value === 'ui-test-app');
         assert.equal(await mode.inputValue(), 'credentials');
         assert(await credentialFields.isVisible() && !await publicFields.isVisible());
+        assert.equal(await api.inputValue(), customApi);
         await screenshot('credentials');
-        console.log('PASS credential mode, masked secret, matching styles and save/reload persistence');
+        console.log('PASS shared API editable in credential mode; masked secret, matching styles and save/reload persistence');
 
         await mode.selectOption('public');
         await secret.evaluate(el => { el.value = ''; });
@@ -89,13 +96,13 @@ const errors = [];
         await saved();
         value = await read();
         assert(!value.UseOwnCredentials && value.AppId === 'ui-test-app' && value.AppSecret === 'ui-test-secret');
-        assert.equal(value.ApiBaseUrl, fixture.ApiBaseUrl);
+        assert.equal(value.ApiBaseUrl, customApi);
         await page.reload({ waitUntil: 'commit' });
-        await page.waitForFunction(() => document.querySelector('#danmakuApi')?.value === 'https://api.dandanplay.net');
+        await page.waitForFunction(() => document.querySelector('#danmakuApi')?.value === 'https://danmaku.example.test/edge');
         assert.equal(await mode.inputValue(), 'public');
         assert(await publicFields.isVisible() && !await credentialFields.isVisible());
         assert.deepEqual(errors, []);
-        console.log('PASS switching back preserves saved credentials; no browser exceptions');
+        console.log('PASS switching back shares API and preserves saved credentials/CORS; no browser exceptions');
     } finally {
         try {
             if (original && page) {

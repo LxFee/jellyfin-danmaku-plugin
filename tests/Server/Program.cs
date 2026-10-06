@@ -100,7 +100,7 @@ var result = await source.GetAsync("comment/123450001", Query("?withRelated=true
 Check(result.Status == 200 && requests.Count == 1, "Signed read succeeds");
 var signed = requests.Single();
 var stamp = signed.Headers.GetValues("X-Timestamp").Single();
-Check(signed.RequestUri!.AbsoluteUri == "https://api.dandanplay.net/api/v2/comment/123450001?withRelated=true&chConvert=1", "Fixed official origin and preserved query");
+Check(signed.RequestUri!.AbsoluteUri == "https://api.dandanplay.net/api/v2/comment/123450001?withRelated=true&chConvert=1", "Default official origin and preserved query");
 Check(signed.Headers.GetValues("X-AppId").Single() == sourceConfig.AppId && signed.Headers.GetValues("X-Signature").Single()
     == DanmakuSource.Sign(sourceConfig.AppId, stamp, "/api/v2/comment/123450001", sourceConfig.AppSecret), "Query excluded from signature");
 Check(!signed.Headers.Contains("X-AppSecret") && !signed.Headers.Contains("X-Emby-Token") && signed.Headers.Authorization is null, "No raw secret or account token sent upstream");
@@ -109,6 +109,24 @@ foreach (var invalid in new[] { "login", "../login", "comment/x", "https://evil.
 Check((await source.GetAsync("comment/1", Query("?target=https://evil.test"), default)).Status == 400, "Unknown parameter rejected");
 Check((await source.GetAsync("comment/1", Query("?chConvert=1&chConvert=2"), default)).Status == 400, "Duplicate parameter rejected");
 Check(requests.Count == 1, "Rejected requests never reach upstream");
+sourceConfig.ApiBaseUrl = "https://danmaku.example.test/edge/";
+result = await source.GetAsync("comment/123450001", Query("?withRelated=true&chConvert=1"), default);
+signed = requests.Last();
+stamp = signed.Headers.GetValues("X-Timestamp").Single();
+Check(result.Status == 200 && signed.RequestUri!.AbsoluteUri == "https://danmaku.example.test/edge/api/v2/comment/123450001?withRelated=true&chConvert=1", "Configured API origin, prefix and trailing slash honored");
+Check(signed.Headers.GetValues("X-Signature").Single() == DanmakuSource.Sign(sourceConfig.AppId, stamp, "/edge/api/v2/comment/123450001", sourceConfig.AppSecret), "Signature uses configured API path without query");
+Check(!signed.Headers.Contains("X-AppSecret") && signed.Headers.Authorization is null, "Custom API receives no raw secret or Jellyfin token");
+sourceConfig.ApiBaseUrl = "http://127.0.0.1:8080/danmaku";
+result = await source.GetAsync("comment/1", Query(""), default);
+Check(result.Status == 200 && requests.Last().RequestUri!.AbsoluteUri == "http://127.0.0.1:8080/danmaku/api/v2/comment/1", "Administrator-configured local API and port supported");
+var validRequests = requests.Count;
+foreach (var invalidBase in new[] { "ftp://danmaku.example.test", "https://user:secret@danmaku.example.test", "https://danmaku.example.test?target=x", "https://danmaku.example.test#fragment", "not-a-url" })
+{
+    sourceConfig.ApiBaseUrl = invalidBase;
+    Check((await source.GetAsync("comment/1", Query(""), default)).Status == 503, "Invalid administrator API URL rejected");
+}
+Check(requests.Count == validRequests, "Invalid API configurations never reach upstream");
+sourceConfig.ApiBaseUrl = "https://api.dandanplay.net";
 upstream.Respond = _ => new HttpResponseMessage(HttpStatusCode.Forbidden) { Content = new StringContent(sourceConfig.AppSecret) };
 result = await source.GetAsync("comment/1", Query(""), default);
 Check(result.Status == 403 && !Encoding.UTF8.GetString(result.Body).Contains(sourceConfig.AppSecret), "Sanitized auth failure");
@@ -135,6 +153,21 @@ upstream.Respond = request =>
 Check((await source.GetAsync("comment/1", Query(""), default)).Status == 200 && redirected, "Official CDN redirect succeeds");
 upstream.Respond = _ => { var response = new HttpResponseMessage(HttpStatusCode.Found); response.Headers.Location = new Uri("https://evil.test/"); return response; };
 Check((await source.GetAsync("comment/1", Query(""), default)).Status == 502, "Foreign redirect rejected");
+sourceConfig.ApiBaseUrl = "http://127.0.0.1:8080/danmaku";
+upstream.Respond = request =>
+{
+    if (request.RequestUri!.AbsolutePath.EndsWith("/api/v2/comment/1", StringComparison.Ordinal))
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.Found);
+        response.Headers.Location = new Uri("/assets/comments.json", UriKind.Relative);
+        return response;
+    }
+    Check(request.RequestUri!.AbsoluteUri == "http://127.0.0.1:8080/assets/comments.json", "Configured origin redirect keeps its port");
+    Check(!request.Headers.Contains("X-AppId") && !request.Headers.Contains("X-Signature") && request.Headers.Authorization is null, "Configured origin redirect strips credentials");
+    return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"comments\":[]}") };
+};
+Check((await source.GetAsync("comment/1", Query(""), default)).Status == 200, "Configured origin redirect succeeds");
+sourceConfig.ApiBaseUrl = "https://api.dandanplay.net";
 sourceConfig.UseOwnCredentials = false;
 Check((await source.GetAsync("comment/1", Query(""), default)).Status == 404, "Own mode must be enabled");
 sourceConfig.UseOwnCredentials = true;

@@ -52,6 +52,21 @@ const errors = [];
             const backend = await page.request.get(root + '/JellyfinDanmaku/api/v2/unsupported', { headers: { Authorization: 'MediaBrowser Token="' + session + '"' } });
             assert.equal(backend.status(), 400); // Real controller authenticates before rejecting the route; no upstream request.
             console.log('PASS actual host authorization without response interception');
+            if (process.env.JELLYFIN_TEST_LOOPBACK_API) {
+                const ownConfig = await page.evaluate(() => ApiClient.getPluginConfiguration('aab50987-0d10-4615-96e3-3a89b758dd28'));
+                try {
+                    await page.evaluate(({ config, url }) => ApiClient.updatePluginConfiguration('aab50987-0d10-4615-96e3-3a89b758dd28',
+                        { ...config, ApiBaseUrl: url }), { config: ownConfig, url: process.env.JELLYFIN_TEST_LOOPBACK_API });
+                    // Point to this host's authenticated danmaku route. The outbound request must use
+                    // the configured origin/prefix without forwarding the Jellyfin session, yielding 401.
+                    const configured = await page.request.get(root + '/JellyfinDanmaku/api/v2/comment/1',
+                        { headers: { Authorization: 'MediaBrowser Token="' + session + '"' } });
+                    assert.equal(configured.status(), 401);
+                    console.log('PASS actual host uses configured API origin/prefix without forwarding Jellyfin session');
+                } finally {
+                    await page.evaluate(config => ApiClient.updatePluginConfiguration('aab50987-0d10-4615-96e3-3a89b758dd28', config), ownConfig);
+                }
+            }
             // Jellyfin hash navigation keeps the already loaded script defaults. Reload after changing mode.
             await page.reload({ waitUntil: 'commit' });
             await page.waitForFunction(() => window.JellyfinDanmakuConfig?.serverApiPrefix === '/JellyfinDanmaku');
