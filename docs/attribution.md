@@ -12,6 +12,6 @@
 
 内嵌渲染代码没有可唯一判定版本的头部，因此不将其标记为原封不动的 Danmaku 2.0.8；代码来源以固定的 `ede.js` 提交为准。链接中的 2.0.8 LICENSE 用于核对 MIT 声明。
 
-本项目新增了 C# 插件封装、网页响应注入、插件配置下发，以及 Jellyfin 12.2 的条目识别、播放器生命周期、会话鉴权、设置按钮和错误处理适配。修改及重现方式见 [上游与适配](upstream.md)。公共 API 候选的参考链接与实测范围见 [公共站点核验](public-sources.md)。
+本项目新增了 C# 插件封装、网页响应注入、插件配置下发，以及 Jellyfin 12.2 的条目识别、播放器生命周期、会话鉴权、设置按钮和错误处理适配。修改及重现方式见 [上游与适配](upstream.md)。公共 API 候选的参考链接与实测范围见 [公共站点核验](https://github.com/LxFee/jellyfin-danmaku-plugin/blob/main/docs/public-sources.md)。
 
 发行包附带根目录 LICENSE 和本文件。公共弹幕接口可能限流或停止服务，插件的 MIT 许可不构成这些接口的服务承诺。
