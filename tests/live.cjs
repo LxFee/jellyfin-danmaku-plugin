@@ -58,12 +58,12 @@ const errors = [];
             console.log('PASS own configuration persistence and public script secret isolation');
         }
         await page.goto(root + '/web/index.html#/configurationpage?name=JellyfinDanmaku', { waitUntil: 'commit' });
-        await page.locator('#danmakuConfigPage').waitFor({ state: 'visible' });
+        await page.locator('#JellyfinDanmakuConfigPage').waitFor({ state: 'visible' });
         await page.waitForFunction(() => document.querySelector('#danmakuApi').value.startsWith('https://'));
         assert.equal(await page.locator('#danmakuAppSecret').getAttribute('type'), 'password');
-        assert.equal(await page.locator('#danmakuOwnCredentials').count(), 1);
-        if (ownMode) assert.equal(await page.locator('#danmakuOwnCredentials').isChecked(), true);
-        await page.locator('#danmakuConfigForm button[type=submit]').click();
+        assert.equal(await page.locator('#danmakuSourceMode').count(), 1);
+        if (ownMode) assert.equal(await page.locator('#danmakuSourceMode').inputValue(), 'credentials');
+        await page.locator('#JellyfinDanmakuConfigForm button[type=submit]').click();
         await page.waitForFunction(() => document.querySelector('#danmakuConfigStatus').textContent.includes('已保存'));
         console.log('PASS native plugin configuration read/save');
         await page.goto(root + '/web/index.html#/details?id=' + credentials.ItemId, { waitUntil: 'commit' });

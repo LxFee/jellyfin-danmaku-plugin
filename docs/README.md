@@ -4,11 +4,11 @@
 
 ## 安装与使用
 
-解压发布包到 Jellyfin 的 `config/plugins/Jellyfin.Danmaku_1.1.0.1/`，保留 DLL、manifest.json 和许可证，升级时把旧版本移出 plugins 目录，重启 Jellyfin。控制台 → 插件 → Jellyfin Danmaku 配置启用开关、默认弹幕源。修改配置后刷新网页。
+解压发布包到 Jellyfin 的 `config/plugins/Jellyfin.Danmaku_1.1.0.2/`，保留 DLL、manifest.json 和许可证，升级时把旧版本移出 plugins 目录，重启 Jellyfin。控制台 → 插件 → Jellyfin Danmaku 配置启用开关、默认弹幕源。修改配置后刷新网页。
 
 在网页内置播放器底部，弹幕图标控制显示，旁边的调节图标打开弹幕设置。支持样式、过滤、偏移、手动匹配和增加弹幕源。个人设置与匹配记录保存在浏览器 localStorage，插件页面的默认开关和本地 XML 偏好只用于没有个人设置的浏览器。
 
-支持[自有弹弹play应用凭据](credentials.md)：插件配置页填写 AppId、AppSecret 并启用，由主站签名和获取弹幕；播放器不接收应用凭据，所有已登录用户使用同一应用额度。
+“在线弹幕来源”提供公共／自建接口和[自有弹弹play应用凭据](credentials.md)两种互斥选择，只显示所选模式的字段。选择自有凭据后填写 AppId、AppSecret，由主站签名和获取弹幕；播放器不接收应用凭据，所有已登录用户使用同一应用额度。
 
 关闭自有凭据模式时，API 与 CORS 前缀沿用上游默认地址，可改成自建的兼容接口，播放器中的个人地址优先于主站默认值。这些地址在浏览器可见，不用于保存官方 AppSecret。公共接口可能限流或耗尽额度；失败不影响视频播放，可修改接口后保存弹幕设置重试。
 

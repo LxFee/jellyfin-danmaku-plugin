@@ -11,7 +11,7 @@
 | 自有凭据模式的同源会话头、BaseUrl、旧 API／CORS 覆盖失效、公共请求不携带 Jellyfin 会话 | 前端固定数据检查通过 |
 | 真实主站／代理入口的应用凭据保存、播放器脚本不包含凭据、匿名 API 拒绝、同源会话读取 | 标准 Authorization 会话头；鉴权用未拦截的受限接口检查，其余弹幕响应使用固定数据，临时假凭据结束恢复原配置 |
 | 自有有效应用凭据的官方在线取数 | 未提供有效凭据，尚未验收；服务端签名与错误行为使用固定上游响应验证 |
-| 原生插件配置页读取和保存 | 真实 12.2 页面通过 |
+| 原生插件配置页读取和保存 | 真实 12.2 页面通过；来源互斥显示、原生输入框样式一致、密码隐藏、必填校验、切换保留另一模式配置及刷新恢复 |
 | 原生视频播放、弹幕 canvas、开关、设置侧栏保存、退出清理与重新播放 | 真实 12.2 视频 + 固定弹幕响应通过 |
 | 代理入口完整页面验收 | 通过；真实视频 + 固定弹幕响应完成播放、设置保存、退出清理及重播 |
 | 上游公共在线弹幕源 | 本次返回 HTTP 429，未验证真实在线弹幕获取成功 |
@@ -30,5 +30,7 @@ node tests/browser.cjs
 浏览器测试需要 Playwright 和 Chrome，执行 `npm --prefix tests ci` 安装测试依赖，或用 `PLAYWRIGHT_MODULE` 指定既有模块路径。真实环境测试使用 `JELLYFIN_TEST_CREDENTIALS` 指向私密 JSON（Username、Password、ItemId），`JELLYFIN_TEST_URL` 指向测试主站/代理，`DANMAKU_FIXTURE=1` 使用固定弹幕响应，然后执行 `node tests/live.cjs`。该测试会播放指定视频并保存同值插件配置，仅用于试用环境；凭据不提交。
 
 追加 `DANMAKU_TEST_OWN_MODE=1` 验证自有凭据模式：测试临时保存假应用凭据并刷新页面，验证公开脚本与同源读取，finally 恢复原配置；需要同时启用固定数据，不向官方提交假凭据。
+
+配置交互检查使用相同的 `JELLYFIN_TEST_CREDENTIALS`、`JELLYFIN_TEST_URL` 和 Playwright 环境执行 `node tests/configuration.cjs`。该检查临时保存假凭据，验证两种模式的显示、校验、配置保留及密码框样式，finally 恢复并核对原配置，不请求在线弹幕源。`DANMAKU_CONFIG_PREVIEW=1` 可在部署前用本地配置 HTML 替换配置页响应；部署验收不使用该选项。
 
 安装和升级使用 Jellyfin 的插件目录。卸载后重启主站即可停止注入，无需恢复 Web 源文件。
