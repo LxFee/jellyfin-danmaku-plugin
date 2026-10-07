@@ -1,12 +1,20 @@
-{
-  "category": "General",
-  "guid": "aab50987-0d10-4615-96e3-3a89b758dd28",
-  "name": "Jellyfin Danmaku",
-  "description": "Web player danmaku adapted for Jellyfin 12.2",
-  "owner": "LxFee",
-  "overview": "Independent web danmaku plugin based on Izumiko/jellyfin-danmaku",
-  "version": "1.1.0.4",
-  "targetAbi": "12.2.0.0",
-  "status": "Active",
-  "autoUpdate": false
-}
+[
+  {
+    "guid": "aab50987-0d10-4615-96e3-3a89b758dd28",
+    "name": "Jellyfin Danmaku",
+    "category": "General",
+    "overview": "Independent web player danmaku for Jellyfin 12.2",
+    "description": "Online episode matching, danmaku sources and player preferences. Version 1.1.0.4 is a prerelease.",
+    "owner": "LxFee",
+    "versions": [
+      {
+        "version": "1.1.0.4",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/LxFee/jellyfin-danmaku-plugin/releases/download/v1.1.0.4/jellyfin-danmaku-1.1.0.4.zip",
+        "checksum": "e94cba20b734df8835992e3d2f899c19",
+        "timestamp": "2026-10-06T14:15:06Z",
+        "changelog": "Jellyfin 12.2 web danmaku prerelease; public API/CORS settings without AppId or AppSecret."
+      }
+    ]
+  }
+]
