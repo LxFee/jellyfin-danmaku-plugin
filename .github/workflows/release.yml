@@ -1,0 +1,136 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: plugin-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build plugin
+        run: dotnet build plugin/Jellyfin.Plugin.Danmaku.csproj -c Release --nologo
+
+      - name: Server compatibility checks
+        run: dotnet run --project tests/Server -c Release
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Browser compatibility checks
+        run: |
+          npm --prefix tests ci --no-audit --no-fund
+          google-chrome --version || google-chrome-stable --version
+          node tests/browser.cjs
+
+      - name: Validate tag against manifest
+        run: |
+          version=$(python3 -c "import json;print(json.load(open('manifest.json'))['version'])")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "manifest.json version is $version but tag is $GITHUB_REF_NAME"
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Package plugin ZIP
+        run: |
+          python3 tools/package.py \
+            --dll plugin/bin/Release/net10.0/Jellyfin.Plugin.Danmaku.dll \
+            --output-dir artifacts
+
+      - name: Generate repository manifest
+        run: |
+          branch="${{ github.event.repository.default_branch }}"
+          rm -f /tmp/existing-repository.json
+          if git cat-file -e "origin/$branch:repository.json" 2>/dev/null; then
+            git show "origin/$branch:repository.json" > /tmp/existing-repository.json
+          fi
+          if git rev-parse --verify --quiet "$GITHUB_REF_NAME^" >/dev/null; then
+            git log --pretty='- %s' "$GITHUB_REF_NAME^..$GITHUB_REF_NAME" > /tmp/changelog.raw
+          else
+            git log -1 --pretty='- %s' > /tmp/changelog.raw
+          fi
+          grep -v '^- chore: update plugin repository' /tmp/changelog.raw > /tmp/changelog.txt || true
+          python3 tools/repository_manifest.py \
+            --zip "artifacts/jellyfin-danmaku-$VERSION.zip" \
+            --source-url "https://github.com/${{ github.repository }}/releases/download/$GITHUB_REF_NAME/jellyfin-danmaku-$VERSION.zip" \
+            --existing /tmp/existing-repository.json \
+            --changelog-file /tmp/changelog.txt \
+            --output artifacts/repository.json
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: |
+            artifacts/jellyfin-danmaku-*.zip
+            artifacts/SHA256SUMS.txt
+            artifacts/repository.json
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" \
+              artifacts/jellyfin-danmaku-*.zip \
+              artifacts/SHA256SUMS.txt \
+              artifacts/repository.json \
+              --clobber
+            gh release edit "$GITHUB_REF_NAME" --title "Jellyfin Danmaku $GITHUB_REF_NAME"
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              artifacts/jellyfin-danmaku-*.zip \
+              artifacts/SHA256SUMS.txt \
+              artifacts/repository.json \
+              --title "Jellyfin Danmaku $GITHUB_REF_NAME" \
+              --generate-notes \
+              --prerelease
+          fi
+
+  publish-manifest:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: artifacts
+
+      - name: Commit repository.json
+        run: |
+          cp artifacts/repository.json repository.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add repository.json
+          if git diff --cached --quiet; then
+            echo "repository.json is already up to date"
+            exit 0
+          fi
+          git commit -m "chore: update plugin repository for $GITHUB_REF_NAME [skip ci]"
+          git push origin "HEAD:${{ github.event.repository.default_branch }}"

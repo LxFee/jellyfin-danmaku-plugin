@@ -83,6 +83,8 @@ const server = http.createServer((request, response) => {
         assert(danmakuRequests.length > 0 && danmakuRequests.every(r => !r.token));
         console.log('PASS public API requests exclude Jellyfin account token');
         const page = await browser.newPage();
+        const saveDialogs = [];
+        page.on('dialog', async dialog => { saveDialogs.push(dialog.message()); await dialog.dismiss(); });
         await page.goto(root);
         await page.evaluate(({ root, firstId }) => {
             window.JellyfinDanmakuConfig = { apiBaseUrl: root, corsProxyUrl: '' };
@@ -97,7 +99,22 @@ const server = http.createServer((request, response) => {
         await page.locator('#danmakuSettings').click();
         await page.locator('#opacity').waitFor({ state: 'attached' });
         await page.locator('.danmakuSidebarSaveButton').click();
+        await page.waitForFunction(() => localStorage.getItem('danmakuopacity') === '0.7');
+        assert.deepEqual(saveDialogs, []);
+        assert.deepEqual(await page.evaluate(() => ['danmakuopacity', 'danmakuspeed', 'danmakusize', 'danmakuheight'].map(key => localStorage.getItem(key))), ['0.7', '200', '18', '0.9']);
         await page.waitForFunction(() => !!window.ede.danmaku);
-        console.log('PASS source failure recovery through settings save');
+        console.log('PASS source failure recovery through settings save (preferences stored, no input alert)');
+        await page.reload();
+        const reloadErrors = [];
+        page.on('pageerror', error => reloadErrors.push(error.message));
+        await page.evaluate(({ root, firstId }) => {
+            window.JellyfinDanmakuConfig = { apiBaseUrl: root, corsProxyUrl: '' };
+            window.ApiClient = { getCurrentUserId: () => 'user', getItem: async () => ({ Id: firstId, Name: '测试', IndexNumber: 1 }) };
+            document.body.insertAdjacentHTML('beforeend', '<div class="videoPlayerContainer"><video></video></div><div data-type="video-osd" style="width:100%;height:500px"><div><button class="btnPause"><span class="material-icons pause"></span></button></div></div>');
+        }, { root, firstId });
+        await page.addScriptTag({ content: source });
+        await page.waitForFunction(() => window.ede?.opacity === 0.7 && window.ede?.speed === 200 && window.ede?.fontSize === 18 && window.ede?.heightRatio === 0.9);
+        assert.deepEqual(reloadErrors, []);
+        console.log('PASS stored player preferences initialize without error');
     } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
 })().catch(e => { console.error(e.message.replace(/https?:\/\/\S+/g, '[url]')); process.exitCode = 1; server.close(); });

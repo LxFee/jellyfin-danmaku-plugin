@@ -8,5 +8,6 @@ try {
     $pluginVersion = (Get-Content manifest.json -Raw | ConvertFrom-Json).version
     $packagePath = "artifacts/jellyfin-danmaku-$pluginVersion.zip"
     Compress-Archive -Path plugin/bin/Release/net10.0/Jellyfin.Plugin.Danmaku.dll,manifest.json,LICENSE,README.md,docs -DestinationPath $packagePath -Force
-    Get-FileHash $packagePath -Algorithm SHA256
+    "SHA256: $((Get-FileHash $packagePath -Algorithm SHA256).Hash.ToLower())"
+    "MD5: $((Get-FileHash $packagePath -Algorithm MD5).Hash.ToLower())"
 } finally { Pop-Location }

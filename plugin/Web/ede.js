@@ -1110,7 +1110,13 @@
         return controlItems.length > 0 ? controlItems : null;
     }
 
-
+    const parseFloatOfRange = (str, lb, hb) => {
+        let parsedValue = parseFloat(str);
+        if (isNaN(parsedValue)) {
+            throw new Error('输入无效!');
+        }
+        return Math.min(Math.max(parsedValue, lb), hb);
+    };
 
     function createButton(opt) {
         let button = document.createElement('button');

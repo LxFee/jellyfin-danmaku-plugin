@@ -76,7 +76,15 @@ span('        let uiAnchor = document.getElementsByClassName(uiAnchorStr);', '  
 replace('        _container.appendChild(span);', '        if (!_container) { menubar.remove(); return; }\n        _container.appendChild(span);')
 replace('        menubar.appendChild(createButton(displayButtonOpts));', '''        menubar.appendChild(createButton(displayButtonOpts));
         menubar.appendChild(createButton({ title: '弹幕设置', id: 'danmakuSettings', class: 'tune', onclick: createDanmakuSidebar }));''')
-span('    // 添加弹幕设置到播放器设置菜单', '    function createButton(opt)', '')
+# Jellyfin 12.2 rejects the injected settings action, so drop that block, but keep
+# parseFloatOfRange: upstream defines it inside the block and EDE/saveSettings use it.
+span('    // 添加弹幕设置到播放器设置菜单', '    function createButton(opt)', '''    const parseFloatOfRange = (str, lb, hb) => {
+        let parsedValue = parseFloat(str);
+        if (isNaN(parsedValue)) {
+            throw new Error('输入无效!');
+        }
+        return Math.min(Math.max(parsedValue, lb), hb);
+    };''')
 span('    async function showDebugInfo(msg)', '    async function getEmbyItemInfo()', '''    function showDebugInfo(msg) {
         const span = document.getElementById('debugInfo');
         if (!span) return;
