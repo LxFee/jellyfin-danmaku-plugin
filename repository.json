@@ -1,0 +1,20 @@
+[
+  {
+    "guid": "aab50987-0d10-4615-96e3-3a89b758dd28",
+    "name": "Jellyfin Danmaku",
+    "versions": [
+      {
+        "version": "1.1.0.5",
+        "changelog": "- [fix]: 恢复播放器设置保存并增加发布流水线",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/LxFee/jellyfin-danmaku-plugin/releases/download/v1.1.0.5/jellyfin-danmaku-1.1.0.5.zip",
+        "checksum": "b08bfac267c24f6bbcc2c1d7f11ca14d",
+        "timestamp": "2026-11-26 16:01:17"
+      }
+    ],
+    "description": "Web player danmaku adapted for Jellyfin 12.2",
+    "overview": "Independent web danmaku plugin based on Izumiko/jellyfin-danmaku",
+    "owner": "LxFee",
+    "category": "General"
+  }
+]
